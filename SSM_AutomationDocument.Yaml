@@ -1,0 +1,18 @@
+description: Automation to remediate open SSH (0.0.0.0/0) in Security Groups using Lambda
+schemaVersion: '0.3'
+assumeRole: '{{ AutomationAssumeRole }}'
+parameters:
+  SecurityGroupId:
+    type: String
+    description: ID of the non-compliant Security Group
+  AutomationAssumeRole:
+    type: String
+    description: IAM role to assume for running automation
+mainSteps:
+  - name: remediateSG
+    action: aws:invokeLambdaFunction
+    timeoutSeconds: 60
+    isEnd: true
+    inputs:
+      FunctionName: arn:aws:lambda:ca-central-1:470951427804:function:RemovePublicSSHRule
+      Payload: '{"SecurityGroupId": "{{ SecurityGroupId }}"}'
