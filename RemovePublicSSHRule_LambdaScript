@@ -1,0 +1,37 @@
+import boto3
+
+def lambda_handler(event, context):
+    sg_id = event.get("SecurityGroupId")
+    if not sg_id:
+        return {"status": "failed", "reason": "SecurityGroupId missing from input"}
+
+    ec2 = boto3.client('ec2')
+    
+    try:
+        response = ec2.describe_security_groups(GroupIds=[sg_id])
+        ip_permissions = response['SecurityGroups'][0]['IpPermissions']
+        
+        to_revoke = []
+
+        for permission in ip_permissions:
+            if permission.get("FromPort") == 22 and permission.get("ToPort") == 22:
+                for ip_range in permission.get("IpRanges", []):
+                    if ip_range.get("CidrIp") == "0.0.0.0/0":
+                        to_revoke.append({
+                            'IpProtocol': permission['IpProtocol'],
+                            'FromPort': permission['FromPort'],
+                            'ToPort': permission['ToPort'],
+                            'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
+                        })
+
+        if to_revoke:
+            ec2.revoke_security_group_ingress(
+                GroupId=sg_id,
+                IpPermissions=to_revoke
+            )
+            return {"status": "revoked", "SecurityGroupId": sg_id}
+        else:
+            return {"status": "no open SSH rule found", "SecurityGroupId": sg_id}
+
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
